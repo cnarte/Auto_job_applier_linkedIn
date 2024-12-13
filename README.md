@@ -1,5 +1,5 @@
 # LinkedIn AI Auto Job Applier 🤖
-This is an web scraping bot that automates the process of job applications on LinkedIn. It searches for jobs relevant to you, answers all questions in application form, customizes your resume based on the collected job information, such as skills required, description, about company, etc. and applies to the job. Can apply 100+ jobs in less than 1 hour.
+This is an web scraping bot that automates the process of job applications on LinkedIn. It searches for jobs relevant to you, answers all questions in application form, customizes your resume based on the collected job information, such as skills required, description, about company, etc. and applies to the job. Can apply 100+ jobs in less than 1 hour. 
 
 
 ## 📽️ See it in Action
@@ -24,10 +24,10 @@ Click on above image to watch the demo or use this link https://youtu.be/gMbB1fW
 
 
 ## ⚙️ How to install
-1. [Python 3](https://www.python.org/) or above. Visit https://www.python.org/downloads/ to download and install Python, or for windows you could visit Microsoft Store and search for "Python". **Please make sure Python is added to Path in System Environment Variables**.
+1. [Python 3.10](https://www.python.org/) or above. Visit https://www.python.org/downloads/ to download and install Python, or for windows you could visit Microsoft Store and search for "Python". **Please make sure Python is added to Path in System Environment Variables**.
 2. Install necessary [Undetected Chromedriver](https://pypi.org/project/undetected-chromedriver/), [PyAutoGUI](https://pypi.org/project/PyAutoGUI/) and [Setuptools](https://pypi.org/project/setuptools/) packages. After Python is installed, OPEN a console/terminal or shell, Use below command that uses the [pip](https://pip.pypa.io/en/stable) command-line tool to install these 3 package.
   ```
-  pip install undetected-chromedriver pyautogui setuptools
+  pip install undetected-chromedriver pyautogui setuptools openai
   ```
 3. Download and install latest version of [Google Chrome](https://www.google.com/chrome) in it's default location, visit https://www.google.com/chrome to download it's installer.
 4. Clone the current git repo or download it as a zip file, url to the latest update https://github.com/GodsScion/Auto_job_applier_linkedIn.
@@ -37,6 +37,7 @@ Click on above image to watch the demo or use this link https://youtu.be/gMbB1fW
   <br> <br>
   If you are using Windows, click on `windows-setup.bat` available in the `/setup` folder, this will install the latest chromedriver automatically.
 6. If you have questions or need help setting it up or to talk in general, join the github server: https://discord.gg/fFp7uUzWCY
+
 
 ## 🔧 How to configure
 1. Open `personals.py` file in `/config` folder and enter your details like name, phone number, address, etc. Whatever you want to fill in your applications.
@@ -143,7 +144,17 @@ With heartfelt appreciation, <br>
 
 
 
-## 🗓️ Update History:
+## 🗓️ Major Updates History:
+### Nov 28, 2024
+- Patched to work for latest changes in Linkedin.
+- Users can now select to follow or not follow companies when submitting application.
+- Frameworks for future AI Developments have been added.
+- AI can now be used to extract skills from job description. 
+
+### Oct 16, 2024
+- Framework for OpenAI API and Local LLMs
+- Framework for RAG
+
 ### Sep 09, 2024
 - Smarter Auto-fill for salaries and notice periods
 - Robust Search location filter, will work in window mode (No need for full screen)
@@ -237,6 +248,7 @@ See [AGPLv3 LICENSE](LICENSE) for more info.
 - **X/Twitter**: https://x.com/gods_scion
 - **Discord**  : godsscion
 
+
 ## 🙌 Community Support and Discussions
 - **Discord Server** : https://discord.gg/fFp7uUzWCY
 - **GitHub**
@@ -247,6 +259,9 @@ See [AGPLv3 LICENSE](LICENSE) for more info.
     - [Polls](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions/categories/polls)
     - [Community Flex](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions/categories/community-flex)
     - [Support Q&A](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions/categories/support-q-a)
+
+
+#### ℹ️ Version: 24.12.3.14.00 Stable Preview
 
 ---
 
