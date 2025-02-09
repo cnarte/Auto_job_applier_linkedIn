@@ -34,7 +34,7 @@ follow_companies = False            # True or False, Note: True or False are cas
 # connect_request_message = ""       # Leave Empty to send connection request without personalized invitation (recommended to leave it empty, since you only get 10 per month without LinkedIn Premium*)
 
 # Do you want the program to run continuously until you stop it? (Beta)
-run_non_stop = False                # True or False, Note: True or False are case-sensitive
+run_non_stop = True                # True or False, Note: True or False are case-sensitive
 '''
 Note: Will be treated as False if `run_in_background = True`
 '''
@@ -81,7 +81,7 @@ smooth_scroll = False               # True or False, Note: True or False are cas
 keep_screen_awake = True            # True or False, Note: True or False are case-sensitive (Note: Will temporarily deactivate when any application dialog boxes are present (Eg: Pause before submit, Help needed for a question..))
 
 # Run in undetected mode to bypass anti-bot protections (Preview Feature, UNSTABLE. Recommended to leave it as False)
-stealth_mode = True                 # True or False, Note: True or False are case-sensitive
+stealth_mode = False                 # True or False, Note: True or False are case-sensitive
 
 # Do you want to get alerts on errors related to AI API connection?
 showAiErrorAlerts = True            # True or False, Note: True or False are case-sensitive

@@ -17,7 +17,7 @@ import os
 import csv
 import re
 import pyautogui
-
+from dotenv import 
 from random import choice, shuffle, randint
 from datetime import datetime
 
@@ -51,15 +51,10 @@ from typing import Literal
 pyautogui.FAILSAFE = False
 # if use_resume_generator:    from resume_generator import is_logged_in_GPT, login_GPT, open_resume_chat, create_custom_resume
 
-
-# < Global Variables and logics
-# Define linkedin_headline with a default value
-linkedin_headline = "SDE @Druva"
-
 if run_in_background == True:
     pause_at_failed_question = False
     pause_before_submit = False
-    run_non_stop = False
+    run_non_stop = False    
 
 first_name = first_name.strip()
 middle_name = middle_name.strip()

@@ -79,13 +79,13 @@ def ai_create_openai_client() -> OpenAI:
         
         client = OpenAI(base_url=llm_api_url, api_key=llm_api_key)
 
-        models = ai_get_models_list(client)
-        if "error" in models:
-            raise ValueError(models[1])
-        if len(models) == 0:
-            raise ValueError("No models are available!")
-        if llm_model not in [model.id for model in models]:
-            raise ValueError(f"Model `{llm_model}` is not found!")
+        # models = ai_get_models_list(client)
+        # if "error" in models:
+        #     raise ValueError(models[1])
+        # if len(models) == 0:
+        #     raise ValueError("No models are available!")
+        # if llm_model not in [model.id for model in models]:
+        #     raise ValueError(f"Model `{llm_model}` is not found!")
         
         print_lg("---- SUCCESSFULLY CREATED OPENAI CLIENT! ----")
         print_lg(f"Using API URL: {llm_api_url}")
@@ -114,24 +114,24 @@ def ai_close_openai_client(client: OpenAI) -> None:
 
 
 
-# Function to get list of models available in OpenAI API
-def ai_get_models_list(client: OpenAI) -> list[ Model | str]:
-    """
-    Function to get list of models available in OpenAI API.
-    * Takes in `client` of type `OpenAI`
-    * Returns a `list` object
-    """
-    try:
-        print_lg("Getting AI models list...")
-        if not client: raise ValueError("Client is not available!")
-        models = client.models.list()
-        ai_check_error(models)
-        print_lg("Available models:")
-        print_lg(models.data, pretty=True)
-        return models.data
-    except Exception as e:
-        critical_error_log("Error occurred while getting models list!", e)
-        return ["error", e]
+# # Function to get list of models available in OpenAI API
+# def ai_get_models_list(client: OpenAI) -> list[ Model | str]:
+#     """
+#     Function to get list of models available in OpenAI API.
+#     * Takes in `client` of type `OpenAI`
+#     * Returns a `list` object
+#     """
+#     try:
+#         print_lg("Getting AI models list...")
+#         if not client: raise ValueError("Client is not available!")
+#         models = client.models.list()
+#         ai_check_error(models)
+#         print_lg("Available models:")
+#         print_lg(models.data, pretty=True)
+#         return models.data
+#     except Exception as e:
+#         critical_error_log("Error occurred while getting models list!", e)
+#         return ["error", e]
 
 
 
