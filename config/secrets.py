@@ -1,18 +1,3 @@
-'''
-Author:     Sai Vignesh Golla
-LinkedIn:   https://www.linkedin.com/in/saivigneshgolla/
-
-Copyright (C) 2024 Sai Vignesh Golla
-
-License:    GNU Affero General Public License
-            https://www.gnu.org/licenses/agpl-3.0.en.html
-            
-GitHub:     https://github.com/GodsScion/Auto_job_applier_linkedIn
-
-version:    24.12.3.10.30
-'''
-
-
 ###################################################### CONFIGURE YOUR TOOLS HERE ######################################################
 
 
@@ -36,19 +21,22 @@ CHECK THE OPENAI API PIRCES AT THEIR WEBSITE (https://openai.com/api/pricing/).
 '''
 
 # Your Local LLM url or other AI api url and port
-llm_api_url = "https://generativelanguage.googleapis.com/v1beta/openai/"       # Examples: "https://api.openai.com/v1/", "http://127.0.0.1:1234/v1/", "http://localhost:1234/v1/"
+llm_api_url = "http://localhost:11434/v1/"
+#"https://generativelanguage.googleapis.com/v1beta/openai/"       # Examples: "https://api.openai.com/v1/", "http://127.0.0.1:1234/v1/", "http://localhost:1234/v1/"
 '''
 Note: Don't forget to add / at the end of your url
 '''
 
 # Your Local LLM API key or other AI API key 
-llm_api_key = "AIzaSyCHuOkW_IuzPsYoCPMRe64l9vBGJsw_yyE"              # Enter your API key in the quotes, make sure it's valid, if not will result in error.
+llm_api_key = "ollama"
+#"AIzaSyCHuOkW_IuzPsYoCPMRe64l9vBGJsw_yyE"              # Enter your API key in the quotes, make sure it's valid, if not will result in error.
 '''
 Note: Leave it empyt as "" or "not-needed" if not needed. Else will result in error!
 '''
 
 # Your local LLM model name or other AI model name
-llm_model = "gemini-1.5-flash"          # Examples: "gpt-3.5-turbo", "gpt-4o", "llama-3.2-3b-instruct"
+llm_model = "deepseek-r1:8b"
+# "gemini-2.0-flash"          # Examples: "gpt-3.5-turbo", "gpt-4o", "llama-3.2-3b-instruct"
 
 
 #
@@ -66,23 +54,3 @@ stream_output = False                    # Examples: True or False. (False is re
 Set `stream_output = True` if you want to stream AI output or `stream_output = False` if not.
 '''
 ##
-
-
-
-
-############################################################################################################
-'''
-THANK YOU for using my tool 😊! Wishing you the best in your job hunt 🙌🏻!
-
-Sharing is caring! If you found this tool helpful, please share it with your peers 🥺. Your support keeps this project alive.
-
-Support my work on <PATREON_LINK>. Together, we can help more job seekers.
-
-As an independent developer, I pour my heart and soul into creating tools like this, driven by the genuine desire to make a positive impact.
-
-Your support, whether through donations big or small or simply spreading the word, means the world to me and helps keep this project alive and thriving.
-
-Gratefully yours 🙏🏻,
-Sai Vignesh Golla
-'''
-############################################################################################################

@@ -1,18 +1,3 @@
-"""
-Author:     Sai Vignesh Golla
-LinkedIn:   https://www.linkedin.com/in/saivigneshgolla/
-
-Copyright (C) 2024 Sai Vignesh Golla
-
-License:    GNU Affero General Public License
-            https://www.gnu.org/licenses/agpl-3.0.en.html
-            
-GitHub:     https://github.com/GodsScion/Auto_job_applier_linkedIn
-
-version:    24.12.3.10.30
-"""
-
-
 ##> Common Response Formats
 array_of_strings = {"type": "array", "items": {"type": "string"}}
 """
@@ -89,5 +74,7 @@ Question:
 {}
 User Info:
 {}
+Answer with answer being in betweem </start> and </end> tags:
+
 """
 #<

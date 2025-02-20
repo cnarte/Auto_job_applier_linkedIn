@@ -1,18 +1,3 @@
-'''
-Author:     Sai Vignesh Golla
-LinkedIn:   https://www.linkedin.com/in/saivigneshgolla/
-
-Copyright (C) 2024 Sai Vignesh Golla
-
-License:    GNU Affero General Public License
-            https://www.gnu.org/licenses/agpl-3.0.en.html
-            
-GitHub:     https://github.com/GodsScion/Auto_job_applier_linkedIn
-
-version:    24.12.3.10.30
-'''
-
-
 from config.secrets import *
 from config.settings import showAiErrorAlerts
 from config.personals import ethnicity, gender, disability_status, veteran_status
@@ -27,6 +12,7 @@ from openai import OpenAI
 from openai.types.model import Model
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 from typing import Iterator, Literal
+from selenium.webdriver.common.by import By
 
 
 apiCheckInstructions = """
@@ -212,17 +198,113 @@ def ai_extract_skills(client: OpenAI, job_description: str, stream: bool = strea
 
 def ai_answer_question(
     client: OpenAI, 
-    question: str, options: list[str] | None = None, question_type: Literal['text', 'textarea', 'single_select', 'multiple_select'] = 'text', 
-    job_description: str = None, about_company: str = None,
+    question: str, 
+    user_info: str,
+    question_type: str = 'text',
+    input_requirements: dict = None,
+    options: list[str] | None = None, 
+    job_description: str = None, 
+    about_company: str = None,
     stream: bool = stream_output
-) -> dict | ValueError:
+) -> str | ValueError:
+    """
+    Function to get AI answer for application questions.
+    Returns a clean string answer based on input requirements.
+    """
     print_lg("-- ANSWERING QUESTION")
     try:
-        prompt = text_questions_prompt.format(question, __user_info)
+        # Build prompt based on input requirements
+        prompt_additions = []
+        if input_requirements:
+            if input_requirements["type"] == "numeric":
+                prompt_additions.append(f"Provide a numeric answer")
+                if input_requirements["min"] is not None:
+                    prompt_additions.append(f"minimum: {input_requirements['min']}")
+                if input_requirements["max"] is not None:
+                    prompt_additions.append(f"maximum: {input_requirements['max']}")
+            elif input_requirements["type"] == "phone":
+                prompt_additions.append("Provide a valid phone number")
+            elif input_requirements["type"] == "email":
+                prompt_additions.append("Provide a valid email address")
+            elif input_requirements["type"] == "url":
+                prompt_additions.append("Provide a valid URL")
+            elif input_requirements["type"] == "currency":
+                prompt_additions.append("Provide a numeric amount")
+            elif input_requirements["type"] == "date":
+                prompt_additions.append("Provide a date in YYYY-MM-DD format")
+            elif input_requirements["type"] == "select" and input_requirements["options"]:
+                prompt_additions.append(f"Choose one of these options: {', '.join(input_requirements['options'])}")
+            
+            if input_requirements["pattern"]:
+                prompt_additions.append(f"Answer must match pattern: {input_requirements['pattern']}")
+            
+            if input_requirements["required"]:
+                prompt_additions.append("This field is required")
+        
+        requirements_str = " (" + "; ".join(prompt_additions) + ")" if prompt_additions else ""
+        prompt = text_questions_prompt.format(question + requirements_str, user_info)
+        print(" ########   Promt_used ######### \n")
+        print_lg(prompt)
         messages = [{"role": "user", "content": prompt}]
-        return ai_completion(client, messages, stream)
+        raw_response = ai_completion(client, messages, stream=False)
+        print(" ########   Raw Output ######### \n")
+        print_lg(raw_response)
+        
+        if isinstance(raw_response, str):
+            try:
+                # Extract answer between tags
+                # Try both formats for start and end tags since the AI might use either format
+                start_tag = "</start>" if "</start>" in raw_response else "<start>"
+                end_tag = "</end>" if "</end>" in raw_response else "<end>"
+                
+                start_idx = raw_response.find(start_tag)
+                end_idx = raw_response.find(end_tag)
+                
+                if start_idx != -1 and end_idx != -1:
+                    # Add length of start tag to get position after the tag
+                    answer = raw_response[start_idx + len(start_tag):end_idx].strip()
+                    
+                    # Validate and format answer based on type
+                    if input_requirements:
+                        if input_requirements["type"] == "numeric":
+                            # Only apply numeric validation if type is explicitly numeric
+                            answer = ''.join(filter(str.isdigit, answer)) or "0"
+                            if input_requirements["min"] and int(answer) < int(input_requirements["min"]):
+                                answer = input_requirements["min"]
+                            if input_requirements["max"] and int(answer) > int(input_requirements["max"]):
+                                answer = input_requirements["max"]
+                        elif input_requirements["type"] == "currency":
+                            # For currency, strip non-digits but don't validate as decimal
+                            answer = ''.join(filter(str.isdigit, answer)) or "0"
+                        elif input_requirements["type"] == "select" and input_requirements["options"]:
+                            # Find closest matching option
+                            answer = find_closest_match(answer, input_requirements["options"])
+                        elif input_requirements["type"] == "phone":
+                            answer = ''.join(filter(str.isdigit, answer))
+                        # For text type, no validation needed - keep original answer
+                    
+                    print_lg(f"Formatted AI Answer: {answer}")
+                    return answer
+                else:
+                    raise ValueError("Could not find answer between </start> and </end> tags")
+            except Exception as e:
+                print_lg(f"Error parsing AI response: {e}")
+                print_lg(f"Raw response: {raw_response}")
+                raise e
+            
+        raise ValueError(f"Unexpected response format from AI: {type(raw_response)}")
     except Exception as e:
         ai_error_alert(f"Error occurred while answering question. {apiCheckInstructions}", e)
+        return str(e)
+
+def find_closest_match(answer: str, options: list[str]) -> str:
+    """Helper function to find closest matching option"""
+    answer_lower = answer.lower()
+    for option in options:
+        if answer_lower == option.lower():
+            return option
+    # If no exact match, return first option as fallback
+    return options[0] if options else answer
 
 
 
@@ -261,16 +343,6 @@ def ai_generate_coverletter(
 
 
 ##< Evaluation Agents
-def ai_evaluate_resume(
-    client: OpenAI, 
-    job_description: str, about_company: str, required_skills: dict,
-    resume: str,
-    stream: bool = stream_output
-) -> dict | ValueError:
-    pass
-
-
-
 def ai_evaluate_resume(
     client: OpenAI, 
     job_description: str, about_company: str, required_skills: dict,

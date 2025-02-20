@@ -1,23 +1,9 @@
-"""
-Author:     Sai Vignesh Golla
-LinkedIn:   https://www.linkedin.com/in/saivigneshgolla/
-
-Copyright (C) 2024 Sai Vignesh Golla
-
-License:    GNU Affero General Public License
-            https://www.gnu.org/licenses/agpl-3.0.en.html
-            
-GitHub:     https://github.com/GodsScion/Auto_job_applier_linkedIn
-
-version:    24.12.3.10.30
-"""
-
 # Imports
 import os
 import csv
 import re
 import pyautogui
-from dotenv import 
+from read_cv_context import process_pdf
 from random import choice, shuffle, randint
 from datetime import datetime
 
@@ -101,15 +87,35 @@ def is_logged_in_LN() -> bool:
     Function to check if user is logged-in in LinkedIn
     * Returns: `True` if user is logged-in or `False` if not
     """
+    # Check if we're on the feed page (definitely logged in)
     if driver.current_url == "https://www.linkedin.com/feed/":
         return True
-    if try_linkText(driver, "Sign in"):
+        
+    # Check for common elements that indicate we're NOT logged in
+    not_logged_in_indicators = [
+        # Check for sign in link
+        lambda: try_linkText(driver, "Sign in"),
+        # Check for sign in button
+        lambda: try_xp(driver, '//button[@type="submit" and contains(text(), "Sign in")]'),
+        # Check for join now link
+        lambda: try_linkText(driver, "Join now"),
+        # Check for welcome heading (login page)
+        lambda: try_xp(driver, '//h1[contains(text(), "Sign in")]'),
+        # Check for login form
+        lambda: try_xp(driver, '//div[@class="login__form"]'),
+    ]
+    
+    # If any of these indicators are found, user is not logged in
+    for check in not_logged_in_indicators:
+        if check():
+            return False
+            
+    # If we're on the login page URL, assume not logged in
+    if "linkedin.com/login" in driver.current_url:
         return False
-    if try_xp(driver, '//button[@type="submit" and contains(text(), "Sign in")]'):
-        return False
-    if try_linkText(driver, "Join now"):
-        return False
-    print_lg("Didn't find Sign in link, so assuming user is logged in!")
+        
+    # If none of the not-logged-in indicators were found, assume user is logged in
+    print_lg("Didn't find login indicators, so assuming user is logged in!")
     return True
 
 
@@ -348,7 +354,7 @@ def get_job_main_details(
             job.find_element(By.CLASS_NAME, "job-card-container__footer-job-state").text
             == "Applied"
         ):
-            skip = True
+            skip = True 
             print_lg(f'Already applied to "{title} | {company}" job. Job ID: {job_id}!')
     except:
         pass
@@ -369,7 +375,11 @@ def get_job_main_details(
 # Function to check for Blacklisted words in About Company
 def check_blacklist(
     rejected_jobs: set, job_id: str, company: str, blacklisted_companies: set
-) -> tuple[set, set, WebElement] | ValueError:
+) -> tuple[set, set, WebElement, str]:
+    """
+    Function to check for Blacklisted words in About Company
+    Returns tuple of (rejected_jobs, blacklisted_companies, jobs_top_card, about_company_text)
+    """
     jobs_top_card = try_find_by_classes(
         driver,
         [
@@ -399,7 +409,7 @@ def check_blacklist(
                 raise ValueError(f'\n"{about_company_org}"\n\nContains "{word}".')
     buffer(click_gap)
     scroll_to_view(driver, jobs_top_card)
-    return rejected_jobs, blacklisted_companies, jobs_top_card
+    return rejected_jobs, blacklisted_companies, jobs_top_card, about_company_org
 
 
 # Function to extract years of experience required from About Job
@@ -431,11 +441,11 @@ def get_job_description() -> (
         jobDescription = "Unknown"
         experience_required = "Unknown"
         found_masters = 0
+        skip = False
+        skipReason = None  # Initialize here
+        skipMessage = None  # Initialize here
         jobDescription = find_by_class(driver, "jobs-box__html-content").text
         jobDescriptionLow = jobDescription.lower()
-        skip = False
-        skipReason = None
-        skipMessage = None
         for word in bad_words:
             if word.lower() in jobDescriptionLow:
                 skipMessage = f'\n{jobDescription}\n\nContains bad word "{word}". Skipping this job!\n'
@@ -494,14 +504,13 @@ def answer_common_questions(label: str, answer: str) -> str:
 
 
 # Function to answer the questions for Easy Apply
-def answer_questions(modal: WebElement, questions_list: set, work_location: str) -> set:
+def answer_questions(modal: WebElement, questions_list: set, work_location: str, job_description: str, about_company: str) -> set:
+    # Initialize questions_list as empty set if None
+    if questions_list is None:
+        questions_list = set()
+        
     # Get all questions from the page
-
     all_questions = modal.find_elements(By.XPATH, ".//div[@data-test-form-element]")
-    # all_questions = modal.find_elements(By.CLASS_NAME, "jobs-easy-apply-form-element")
-    # all_list_questions = modal.find_elements(By.XPATH, ".//div[@data-test-text-entity-list-form-component]")
-    # all_single_line_questions = modal.find_elements(By.XPATH, ".//div[@data-test-single-line-text-form-component]")
-    # all_questions = all_questions + all_list_questions + all_single_line_questions
 
     for Question in all_questions:
         # Check if it's a select Question
@@ -513,7 +522,6 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
                 label_org = label.find_element(By.TAG_NAME, "span").text
             except:
                 pass
-            answer = "Yes"
             label = label_org.lower()
             select = Select(select)
             selected_option = select.first_selected_option.text
@@ -523,48 +531,80 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
                 optionsText = [option.text for option in select.options]
                 options = "".join([f' "{option}",' for option in optionsText])
             prev_answer = selected_option
+            answer = selected_option  # Initialize answer with current selection
+
             if overwrite_previous_answers or selected_option == "Select an option":
+                # Try manual logic first
+                manual_answer = None  # Use a different variable for manual logic attempt
                 if "email" in label or "phone" in label:
-                    answer = prev_answer
+                    manual_answer = prev_answer
                 elif "gender" in label or "sex" in label:
-                    answer = gender
+                    manual_answer = gender
                 elif "disability" in label:
-                    answer = disability_status
+                    manual_answer = disability_status
                 elif "proficiency" in label:
-                    answer = "Professional"
+                    manual_answer = "Professional"
                 else:
-                    answer = answer_common_questions(label, answer)
+                    manual_answer = answer_common_questions(label, "Yes")
+
                 try:
-                    select.select_by_visible_text(answer)
-                except NoSuchElementException as e:
+                    if manual_answer:
+                        select.select_by_visible_text(manual_answer)
+                        answer = manual_answer
+                except NoSuchElementException:
+                    # Try finding similar options if exact match fails
                     possible_answer_phrases = (
                         ["Decline", "not wish", "don't wish", "Prefer not", "not want"]
-                        if answer == "Decline"
-                        else [answer]
-                    )
+                        if manual_answer == "Decline"
+                        else [manual_answer]
+                    ) if manual_answer else []
+                    
                     foundOption = False
-                    for phrase in possible_answer_phrases:
-                        for option in optionsText:
-                            if phrase in option:
-                                select.select_by_visible_text(option)
-                                answer = (
-                                    f"Decline ({option})"
-                                    if len(possible_answer_phrases) > 1
-                                    else option
-                                )
-                                foundOption = True
+                    if possible_answer_phrases:
+                        for phrase in possible_answer_phrases:
+                            for option in optionsText:
+                                if phrase in option:
+                                    select.select_by_visible_text(option)
+                                    answer = (
+                                        f"Decline ({option})"
+                                        if len(possible_answer_phrases) > 1
+                                        else option
+                                    )
+                                    foundOption = True
+                                    break
+                            if foundOption:
                                 break
-                        if foundOption:
-                            break
+
+                    # If manual logic failed, try AI
                     if not foundOption:
-                        print_lg(
-                            f'Failed to find an option with text "{answer}" for question labelled "{label_org}", answering randomly!'
-                        )
-                        select.select_by_index(randint(1, len(select.options) - 1))
-                        answer = select.first_selected_option.text
-                        randomly_answered_questions.add(
-                            (f"{label_org} [ {options} ]", "select")
-                        )
+                        try:
+                            ai_answer = ai_answer_question(
+                                aiClient,
+                                question=label_org,
+                                question_type='text',
+                                job_description=job_description,
+                                about_company=about_company,
+                                user_info=cv_content
+                            )
+                            
+                            # Try to find the AI's answer in the options
+                            for option in select.options:
+                                if ai_answer.lower() in option.text.lower():
+                                    select.select_by_visible_text(option.text)
+                                    answer = option.text
+                                    foundOption = True
+                                    break
+                        except Exception as e:
+                            print_lg("AI answering failed")
+                            
+                        # If both manual and AI failed, fall back to random
+                        if not foundOption:
+                            select.select_by_index(randint(1, len(select.options) - 1))
+                            answer = select.first_selected_option.text
+                            randomly_answered_questions.add(
+                                (f"{label_org} [ {options} ]", "select")
+                            )
+
             questions_list.add(
                 (f"{label_org} [ {options} ]", answer, "select", prev_answer)
             )
@@ -588,7 +628,6 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
             except:
                 pass
             label_org = label.text if label else "Unknown"
-            answer = "Yes"
             label = label_org.lower()
 
             label_org += " [ "
@@ -600,12 +639,14 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
                 option_label = try_xp(radio, f'.//label[@for="{id}"]', False)
                 options_labels.append(
                     f'"{option_label.text if option_label else "Unknown"}"<{option.get_attribute("value")}>'
-                )  # Saving option as "label <value>"
+                )
                 if option.is_selected():
                     prev_answer = options_labels[-1]
                 label_org += f" {options_labels[-1]},"
 
             if overwrite_previous_answers or prev_answer is None:
+                # Try manual logic first
+                answer = None
                 if "citizenship" in label or "employment eligibility" in label:
                     answer = us_citizenship
                 elif "veteran" in label or "protected" in label:
@@ -613,46 +654,70 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
                 elif "disability" in label or "handicapped" in label:
                     answer = disability_status
                 else:
-                    answer = answer_common_questions(label, answer)
-                foundOption = try_xp(
-                    radio, f".//label[normalize-space()='{answer}']", False
-                )
-                if foundOption:
-                    actions.move_to_element(foundOption).click().perform()
-                else:
+                    answer = answer_common_questions(label, "Yes")
+
+                foundOption = False
+                if answer:
+                    foundOption = try_xp(
+                        radio, f".//label[normalize-space()='{answer}']", False
+                    )
+                    if foundOption:
+                        actions.move_to_element(foundOption).click().perform()
+                
+                if not foundOption:
+                    # Try finding similar options
                     possible_answer_phrases = (
                         ["Decline", "not wish", "don't wish", "Prefer not", "not want"]
                         if answer == "Decline"
                         else [answer]
-                    )
+                    ) if answer else []
+
                     ele = options[0]
                     answer = options_labels[0]
-                    for phrase in possible_answer_phrases:
-                        for i, option_label in enumerate(options_labels):
-                            if phrase in option_label:
-                                foundOption = options[i]
-                                ele = foundOption
-                                answer = (
-                                    f"Decline ({option_label})"
-                                    if len(possible_answer_phrases) > 1
-                                    else option_label
-                                )
+                    
+                    if possible_answer_phrases:
+                        for phrase in possible_answer_phrases:
+                            for i, option_label in enumerate(options_labels):
+                                if phrase in option_label:
+                                    foundOption = options[i]
+                                    ele = foundOption
+                                    answer = (
+                                        f"Decline ({option_label})"
+                                        if len(possible_answer_phrases) > 1
+                                        else option_label
+                                    )
+                                    break
+                            if foundOption:
                                 break
-                        if foundOption:
-                            break
-                    # if answer == 'Decline':
-                    #     answer = options_labels[0]
-                    #     for phrase in ["Prefer not", "not want", "not wish"]:
-                    #         foundOption = try_xp(radio, f".//label[normalize-space()='{phrase}']", False)
-                    #         if foundOption:
-                    #             answer = f'Decline ({phrase})'
-                    #             ele = foundOption
-                    #             break
+
+                    # If manual logic failed, try AI
+                    if not foundOption:
+                        try:
+                            ai_answer = ai_answer_question(
+                                aiClient,
+                                question=label_org,
+                                question_type='radio',
+                                job_description=job_description,
+                                about_company=about_company,
+                                user_info=cv_content
+                            )
+                            
+                            # Try to find the AI's answer in the options
+                            for i, option_label in enumerate(options_labels):
+                                if ai_answer.lower() in option_label.lower():
+                                    ele = options[i]
+                                    answer = option_label
+                                    foundOption = True
+                                    break
+                        except Exception as e:
+                            print_lg("AI answering failed")
+
                     actions.move_to_element(ele).click().perform()
                     if not foundOption:
                         randomly_answered_questions.add((f"{label_org} ]", "radio"))
             else:
                 answer = prev_answer
+
             questions_list.add((label_org + " ]", answer, "radio", prev_answer))
             continue
 
@@ -666,11 +731,15 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
             except:
                 pass
             label_org = label.text if label else "Unknown"
-            answer = ""  # years_of_experience
             label = label_org.lower()
-
             prev_answer = text.get_attribute("value")
+
+            # Get input requirements
+            input_requirements = get_input_requirements(text, label_org)
+
             if not prev_answer or overwrite_previous_answers:
+                # Try manual logic first
+                answer = ""
                 if "experience" in label or "years" in label:
                     answer = years_of_experience
                 elif "phone" in label or "mobile" in label:
@@ -679,9 +748,9 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
                     answer = street
                 elif "city" in label or "location" in label or "address" in label:
                     answer = current_city if current_city else work_location
-                    do_actions = True
+                    do_actions = True  # Flag for location dropdown handling
                 elif "signature" in label:
-                    answer = full_name  # 'signature' in label or 'legal name' in label or 'your name' in label or 'full name' in label: answer = full_name     # What if question is 'name of the city or university you attend, name of referral etc?'
+                    answer = full_name
                 elif "name" in label:
                     if "full" in label:
                         answer = full_name
@@ -748,16 +817,79 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
                 elif "country" in label:
                     answer = country
                 else:
-                    answer = answer_common_questions(label, answer)
-                if answer == "":
-                    randomly_answered_questions.add((label_org, "text"))
-                    answer = years_of_experience
+                    answer = answer_common_questions(label, "")
+
+                # If manual logic didn't provide an answer, try AI
+                if not answer:
+                    try:
+                        answer = ai_answer_question(
+                            aiClient,
+                            question=f"{label_org}",
+                            question_type=input_requirements["type"],
+                            input_requirements=input_requirements,
+                            job_description=job_description,
+                            about_company=about_company,
+                            user_info=cv_content
+                        )
+                    except Exception as e:
+                        print_lg(f"AI answering failed for question: {label_org}")
+                        answer = years_of_experience
+                        randomly_answered_questions.add((label_org, "text"))
+
                 text.clear()
                 text.send_keys(answer)
+                buffer(0.5)  # Small wait to let validation errors appear
+                
+                # Check for validation error
+                try:
+                    error_message = text.find_element(By.XPATH, "./following-sibling::div[contains(@class, 'error')]").text
+                    if error_message:
+                        print_lg(f"Input validation error: {error_message}")
+                        
+                        # Update input_requirements with error message
+                        if "decimal number larger than" in error_message:
+                            input_requirements["type"] = "numeric"
+                            input_requirements["format"] = "decimal"
+                            try:
+                                min_value = float(error_message.split("larger than")[1].strip())
+                                input_requirements["min"] = str(min_value)
+                            except:
+                                input_requirements["min"] = "0.0"
+                        
+                        # Try getting new answer from AI with updated input_requirements
+                        try:
+                            new_answer = ai_answer_question(
+                                aiClient,
+                                question=f"{label_org} (Previous error: {error_message})",
+                                question_type=input_requirements["type"],
+                                input_requirements=input_requirements,
+                                job_description=job_description,
+                                about_company=about_company,
+                                user_info=cv_content
+                            )
+                            text.clear()
+                            text.send_keys(new_answer)
+                            answer = new_answer  # Update answer for questions_list
+                        except Exception as e:
+                            print_lg(f"AI retry failed: {e}")
+                            randomly_answered_questions.add((label_org, "text"))
+                except NoSuchElementException:
+                    pass  # No validation error found
+                
+                # Handle location dropdown selection
                 if do_actions:
-                    sleep(2)
-                    actions.send_keys(Keys.ARROW_DOWN)
-                    actions.send_keys(Keys.ENTER).perform()
+                    try:
+                        # Try to find and click the first dropdown option relative to the current input
+                        dropdown_option = WebDriverWait(driver, 5).until(
+                            EC.presence_of_element_located((By.XPATH, ".//ancestor::div[contains(@class, 'jobs-easy-apply-form-section__grouping')]//div[@role='listbox']//div[@role='option'][1]"))
+                        )
+                        actions.move_to_element(dropdown_option).click().perform()
+                    except Exception as e:
+                        print_lg(f"Failed to select location from dropdown: {e}")
+                        # Fallback to old behavior if dropdown selection fails
+                        actions.send_keys(Keys.ARROW_DOWN)
+                        actions.send_keys(Keys.ENTER).perform()
+
             questions_list.add(
                 (label, text.get_attribute("value"), "text", prev_answer)
             )
@@ -769,17 +901,34 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
             label = try_xp(Question, ".//label[@for]", False)
             label_org = label.text if label else "Unknown"
             label = label_org.lower()
-            answer = ""
             prev_answer = text_area.get_attribute("value")
+
             if not prev_answer or overwrite_previous_answers:
+                # Try manual logic first
+                answer = ""
                 if "summary" in label:
                     answer = linkedin_summary
                 elif "cover" in label:
                     answer = cover_letter
+
+                # If manual logic didn't provide an answer, try AI
+                if not answer:
+                    try:
+                        answer = ai_answer_question(
+                            aiClient,
+                            question=label_org,
+                            question_type="textarea",
+                            job_description=job_description,
+                            about_company=about_company,
+                            user_info=cv_content
+                        )
+                    except Exception as e:
+                        print_lg(f"AI answering failed for textarea: {label_org}")
+                        randomly_answered_questions.add((label_org, "textarea"))
+
                 text_area.clear()
                 text_area.send_keys(answer)
-                if answer == "":
-                    randomly_answered_questions.add((label_org, "textarea"))
+
             questions_list.add(
                 (label, text_area.get_attribute("value"), "textarea", prev_answer)
             )
@@ -791,19 +940,21 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
             label = try_xp(Question, ".//span[@class='visually-hidden']", False)
             label_org = label.text if label else "Unknown"
             label = label_org.lower()
-            answer = try_xp(
-                Question, ".//label[@for]", False
-            )  # Sometimes multiple checkboxes are given for 1 question, Not accounted for that yet
+            answer = try_xp(Question, ".//label[@for]", False)
             answer = answer.text if answer else "Unknown"
             prev_answer = checkbox.is_selected()
             checked = prev_answer
+
             if not prev_answer:
+                # Try manual logic first - default to checking most boxes
                 try:
                     actions.move_to_element(checkbox).click().perform()
                     checked = True
                 except Exception as e:
                     print_lg("Checkbox click failed!", e)
+                    # Could add AI logic here if needed for specific checkbox decisions
                     pass
+
             questions_list.add(
                 (f"{label} ([X] {answer})", checked, "checkbox", prev_answer)
             )
@@ -811,10 +962,6 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str)
 
     # Select todays date
     try_xp(driver, "//button[contains(@aria-label, 'This is today')]")
-
-    # Collect important skills
-    # if 'do you have' in label and 'experience' in label and ' in ' in label -> Get word (skill) after ' in ' from label
-    # if 'how many years of experience do you have in ' in label -> Get word (skill) after ' in '
 
     return questions_list
 
@@ -1131,7 +1278,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                     screenshot_name = "Not Available"
 
                     try:
-                        rejected_jobs, blacklisted_companies, jobs_top_card = (
+                        rejected_jobs, blacklisted_companies, jobs_top_card, about_company = (
                             check_blacklist(
                                 rejected_jobs, job_id, company, blacklisted_companies
                             )
@@ -1152,6 +1299,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                         continue
                     except Exception as e:
                         print_lg("Failed to scroll to About Company!")
+                        about_company = "Unknown"
                         # print_lg(e)
 
                     # Hiring Manager info
@@ -1234,65 +1382,63 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                             try:
                                 errored = ""
                                 modal = find_by_class(driver, "jobs-easy-apply-modal")
-                                wait_span_click(modal, "Next", 1)
-                                # if description != "Unknown":
-                                #     resume = create_custom_resume(description)
-                                resume = "Previous resume"
-                                next_button = True
-                                questions_list = set()
-                                next_counter = 0
-                                while next_button:
-                                    next_counter += 1
-                                    if next_counter >= 15:
-                                        if pause_at_failed_question:
-                                            screenshot(
-                                                driver,
-                                                job_id,
-                                                "Needed manual intervention for failed question",
-                                            )
-                                            pyautogui.alert(
-                                                'Couldn\'t answer one or more questions.\nPlease click "Continue" once done.\nDO NOT CLICK Back, Next or Review button in LinkedIn.\n\n\n\n\nYou can turn off "Pause at failed question" setting in config.py',
-                                                "Help Needed",
-                                                "Continue",
-                                            )
-                                            next_counter = 1
-                                            continue
-                                        if questions_list:
-                                            print_lg(
-                                                "Stuck for one or some of the following questions...",
-                                                questions_list,
-                                            )
-                                        screenshot_name = screenshot(
-                                            driver, job_id, "Failed at questions"
-                                        )
-                                        errored = "stuck"
-                                        raise Exception(
-                                            "Seems like stuck in a continuous loop of next, probably because of new questions."
-                                        )
-                                    questions_list = answer_questions(
-                                        modal, questions_list, work_location
-                                    )
-                                    if useNewResume and not uploaded:
-                                        uploaded, resume = upload_resume(
-                                            modal, default_resume_path
-                                        )
+                                
+                                # Keep clicking Next until we find Submit or run out of Next buttons
+                                while True:
+                                    # Try to find Submit application button first
+                                    submit_button = None
                                     try:
-                                        next_button = modal.find_element(
-                                            By.XPATH,
-                                            './/span[normalize-space(.)="Review"]',
-                                        )
-                                    except NoSuchElementException:
-                                        next_button = modal.find_element(
-                                            By.XPATH,
-                                            './/button[contains(span, "Next")]',
-                                        )
-                                    try:
-                                        next_button.click()
-                                    except ElementClickInterceptedException:
-                                        break  # Happens when it tries to click Next button in About Company photos section
-                                    buffer(click_gap)
+                                        # Try finding Submit application button with exact text match
+                                        submit_button = modal.find_element(By.XPATH, './/button[.//span[text()="Submit application"]]')
+                                    except:
+                                        try:
+                                            # Try finding by aria-label
+                                            submit_button = modal.find_element(By.XPATH, './/button[contains(@aria-label, "Submit application")]')
+                                        except:
+                                            submit_button = None
 
-                            except NoSuchElementException:
+                                    # If we found Submit button, break the loop
+                                    if submit_button:
+                                        print_lg("Found Submit application button - this appears to be the final step")
+                                        break
+
+                                    # If no Submit button, look for Next button
+                                    next_button = None
+                                    try:
+                                        # Try finding Next button by exact text match first
+                                        next_button = modal.find_element(By.XPATH, './/button[.//span[text()="Next"]]')
+                                    except:
+                                        try:
+                                            # Try finding by aria-label
+                                            next_button = modal.find_element(By.XPATH, './/button[contains(@aria-label, "Continue to next step")]')
+                                        except:
+                                            try:
+                                                # Try finding by partial text match
+                                                next_button = modal.find_element(By.XPATH, './/button[contains(.//span, "Next")]')
+                                            except:
+                                                try:
+                                                    # Try finding by class name pattern
+                                                    next_button = modal.find_element(By.XPATH, './/button[contains(@class, "artdeco-button--primary")]')
+                                                except:
+                                                    # If we can't find Next button either, we might be stuck
+                                                    print_lg("Could not find Next or Submit button in any expected format")
+                                                    raise Exception("Neither Next nor Submit button found")
+
+                                    if next_button:
+                                        # Answer questions on current page before clicking Next
+                                        questions_list = answer_questions(modal, questions_list, work_location, description, about_company)
+                                        
+                                        print_lg("Found Next button - proceeding to next step")
+                                        scroll_to_view(driver, next_button)
+                                        buffer(1)  # Small wait before click
+                                        next_button.click()
+                                        buffer(click_gap)
+                                    else:
+                                        # If we can't find either button, something's wrong
+                                        raise Exception("Neither Next nor Submit button found")
+
+                            except Exception as e:
+                                print(e)
                                 errored = "nose"
                             finally:
                                 if questions_list and errored != "stuck":
@@ -1481,7 +1627,7 @@ linkedIn_tab = False
 def main() -> None:
     try:
         global linkedIn_tab, tabs_count, useNewResume, aiClient
-        alert_title = "Error Occurred. Closing Browser!"
+        alert_title = "Error Occurred. Closing Browser!"  # Initialize here
         total_runs = 1
         validate_config()
 
@@ -1595,7 +1741,7 @@ def main() -> None:
                 "The only limit to our realization of tomorrow will be our doubts of today. - Franklin D. Roosevelt",
             ]
         )
-        msg = f"\n{quote}\n\n\nBest regards,\nSai Vignesh Golla\nhttps://www.linkedin.com/in/saivigneshgolla/\n\n"
+        msg = f"\n{quote}\n\n\nBest regards,\nAnkit Cnarte\nhttps://www.linkedin.com/in/cnarte/\n\n"
         pyautogui.alert(msg, "Exiting..")
         print_lg(msg, "Closing the browser...")
         if tabs_count >= 10:
@@ -1609,5 +1755,100 @@ def main() -> None:
             critical_error_log("When quitting...", e)
 
 
+def get_input_requirements(element: WebElement, label: str) -> dict:
+    """
+    Analyzes form element to determine input requirements
+    Returns a dict with input type and constraints
+    """
+    requirements = {
+        "type": "text",  # Default type
+        "format": None,
+        "min": None,
+        "max": None,
+        "pattern": None,
+        "options": None,
+        "required": False
+    }
+    
+    try:
+        # Check if element is required
+        requirements["required"] = element.get_attribute("required") is not None or "*" in label
+        
+        # Get input type and validation message
+        error_message = None
+        try:
+            error_message = element.find_element(By.XPATH, "./following-sibling::div[contains(@class, 'error')]").text
+        except:
+            pass
+            
+        # Get input type
+        if element.tag_name == "select":
+            requirements["type"] = "select"
+            options = element.find_elements(By.TAG_NAME, "option")
+            requirements["options"] = [opt.text for opt in options]
+        
+        elif element.tag_name == "input":
+            input_type = element.get_attribute("type")
+            if input_type in ["number", "tel"]:
+                requirements["type"] = "numeric"
+                requirements["min"] = element.get_attribute("min") or "0"
+                requirements["max"] = element.get_attribute("max")
+                # Check error message for numeric constraints
+                if error_message and "decimal number larger than" in error_message:
+                    try:
+                        min_value = float(error_message.split("larger than")[1].strip())
+                        requirements["min"] = str(min_value)
+                    except:
+                        pass
+            elif input_type == "email":
+                requirements["type"] = "email"
+            elif input_type == "url":
+                requirements["type"] = "url"
+            
+            # Check for pattern attribute
+            pattern = element.get_attribute("pattern")
+            if pattern:
+                requirements["pattern"] = pattern
+        
+        elif element.tag_name == "textarea":
+            requirements["type"] = "textarea"
+            requirements["max"] = element.get_attribute("maxlength")
+        
+        # Additional type inference from label text
+        label_lower = label.lower()
+        if any(word in label_lower for word in ["phone", "mobile", "contact"]):
+            requirements["type"] = "phone"
+        elif "salary" in label_lower or "ctc" in label_lower:
+            requirements["type"] = "currency"
+            requirements["min"] = "0"
+        elif any(word in label_lower for word in ["experience", "exp"]):
+            requirements["type"] = "numeric"
+            requirements["min"] = "0"
+            requirements["max"] = "50"
+            # If years specified, ensure decimal places
+            if "year" in label_lower:
+                requirements["format"] = "decimal"
+        elif "date" in label_lower:
+            requirements["type"] = "date"
+        elif "email" in label_lower:
+            requirements["type"] = "email"
+        elif "website" in label_lower or "url" in label_lower or "link" in label_lower:
+            requirements["type"] = "url"
+            
+        # Handle special cases for experience fields
+        if "experience" in label_lower and requirements["type"] == "numeric":
+            requirements["format"] = "decimal"
+            if not requirements["min"]:
+                requirements["min"] = "0.0"
+        
+        print_lg(f"Input requirements for '{label}': {requirements}")
+        return requirements
+    
+    except Exception as e:
+        print_lg(f"Error determining input requirements: {e}")
+        return requirements
+
+
 if __name__ == "__main__":
+    cv_content = process_pdf(default_resume_path)
     main()

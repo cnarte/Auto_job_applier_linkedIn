@@ -1,16 +1,3 @@
-'''
-Author:     Sai Vignesh Golla
-LinkedIn:   https://www.linkedin.com/in/saivigneshgolla/
-
-Copyright (C) 2024 Sai Vignesh Golla
-
-License:    GNU Affero General Public License
-            https://www.gnu.org/licenses/agpl-3.0.en.html
-            
-GitHub:     https://github.com/GodsScion/Auto_job_applier_linkedIn
-
-version:    24.12.3.10.30
-'''
 
 from config.settings import click_gap, smooth_scroll
 from modules.helpers import buffer, print_lg, sleep
@@ -52,14 +39,6 @@ def multi_sel(driver: WebDriver, texts: list, time: float=5.0) -> None:
     '''
     for text in texts:
         wait_span_click(driver, text, time)
-        try:
-            button = WebDriverWait(driver,time).until(EC.presence_of_element_located((By.XPATH, './/span[normalize-space(.)="'+text+'"]')))
-            scroll_to_view(driver, button)
-            button.click()
-            buffer(click_gap)
-        except Exception as e:
-            print_lg("Click Failed! Didn't find '"+text+"'")
-            # print_lg(e)
 
 def multi_sel_noWait(driver: WebDriver, texts: list, actions: ActionChains = None) -> None:
     '''
@@ -131,7 +110,7 @@ def try_xp(driver: WebDriver, xpath: str, click: bool=True) -> WebElement | bool
     except: return False
 
 def try_linkText(driver: WebDriver, linkText: str) -> WebElement | bool:
-    try:    return driver.find_element(By.LINK_TEXT, linkText)
+    try:    return      driver.find_element(By.LINK_TEXT, linkText)
     except:  return False
 
 def try_find_by_classes(driver: WebDriver, classes: list[str]) -> WebElement | ValueError:
